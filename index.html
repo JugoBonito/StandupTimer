@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Standup Timer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1 class="app-title">Standup Timer</h1>
+
+    <div class="phase-card" id="phaseCard">
+      <div class="phase-icon" id="phaseIcon" aria-hidden="true"></div>
+      <div class="phase-label" id="phaseLabel">Sitting</div>
+      <div class="timer-display" id="timerDisplay">40:00</div>
+      <div class="phase-subtext" id="phaseSubtext">Time to sit and focus</div>
+    </div>
+
+    <div class="progress-bar-container" aria-label="Phase progress">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="loop-info">
+      <span>Loop #<span id="loopCount">1</span></span>
+      <span class="phase-steps">
+        <span class="step active" id="step0">⬤ Sit 40m</span>
+        <span class="step-sep">→</span>
+        <span class="step" id="step1">⬤ Stand 15m</span>
+        <span class="step-sep">→</span>
+        <span class="step" id="step2">⬤ Move 5m</span>
+      </span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="startStopBtn" aria-label="Start timer">▶ Start</button>
+      <button class="btn btn-secondary" id="resetBtn" aria-label="Reset timer">↺ Reset</button>
+      <button class="btn btn-secondary" id="skipBtn" aria-label="Skip to next phase">⏭ Skip</button>
+    </div>
+
+    <div class="mute-row">
+      <label class="mute-label">
+        <input type="checkbox" id="muteCheckbox" />
+        Mute notifications
+      </label>
+    </div>
+  </div>
+
+  <script src="timer.js"></script>
+</body>
+</html>
