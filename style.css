@@ -1,0 +1,220 @@
+/* =====================================================
+   Standup Timer – style.css
+   ===================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0f1117;
+  --card-bg: #1a1d27;
+  --accent-sit:   #4f8ef7;   /* blue  – Sitting  */
+  --accent-stand: #34d399;   /* green – Standing */
+  --accent-move:  #f97316;   /* orange – Moving  */
+  --text: #e8eaf0;
+  --text-muted: #7b809a;
+  --radius: 20px;
+  --transition: 0.5s ease;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.container {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+/* ---- Title ---- */
+.app-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ---- Phase card ---- */
+.phase-card {
+  width: 100%;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 40px 32px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  border: 2px solid transparent;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.phase-card.sit   { border-color: var(--accent-sit);   box-shadow: 0 0 40px rgba(79,142,247,0.15); }
+.phase-card.stand { border-color: var(--accent-stand); box-shadow: 0 0 40px rgba(52,211,153,0.15); }
+.phase-card.move  { border-color: var(--accent-move);  box-shadow: 0 0 40px rgba(249,115,22,0.15); }
+
+.phase-icon {
+  font-size: 4rem;
+  line-height: 1;
+  transition: transform var(--transition);
+}
+
+.phase-label {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color var(--transition);
+}
+
+.phase-card.sit   .phase-label { color: var(--accent-sit);   }
+.phase-card.stand .phase-label { color: var(--accent-stand); }
+.phase-card.move  .phase-label { color: var(--accent-move);  }
+
+.timer-display {
+  font-size: 5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  transition: color var(--transition);
+}
+
+.phase-card.sit   .timer-display { color: var(--accent-sit);   }
+.phase-card.stand .timer-display { color: var(--accent-stand); }
+.phase-card.move  .timer-display { color: var(--accent-move);  }
+
+.phase-subtext {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ---- Progress bar ---- */
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: var(--card-bg);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 100%;
+  border-radius: 99px;
+  background: var(--accent-sit);
+  transition: width 1s linear, background var(--transition);
+}
+
+/* ---- Loop info ---- */
+.loop-info {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.phase-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.step {
+  opacity: 0.35;
+  transition: opacity var(--transition), color var(--transition);
+}
+
+.step.active { opacity: 1; }
+
+.step-sep { opacity: 0.3; }
+
+#step0.active { color: var(--accent-sit);   }
+#step1.active { color: var(--accent-stand); }
+#step2.active { color: var(--accent-move);  }
+
+/* ---- Controls ---- */
+.controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btn {
+  padding: 12px 28px;
+  border: none;
+  border-radius: 99px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn:active { transform: scale(0.96); }
+
+.btn-primary {
+  background: var(--accent-sit);
+  color: #fff;
+  min-width: 130px;
+}
+
+.btn-secondary {
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid #2e3045;
+}
+
+/* ---- Mute row ---- */
+.mute-row {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.mute-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* ---- Pulse animation when phase changes ---- */
+@keyframes pulse {
+  0%   { transform: scale(1);    opacity: 1; }
+  50%  { transform: scale(1.12); opacity: 0.8; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
+.phase-card.pulsing .phase-icon,
+.phase-card.pulsing .timer-display {
+  animation: pulse 0.6s ease;
+}
+
+/* ---- Flash overlay when time is almost up ---- */
+@keyframes flash-border {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.phase-card.warning {
+  animation: flash-border 1s ease infinite;
+}
