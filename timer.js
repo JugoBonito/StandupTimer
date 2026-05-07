@@ -46,6 +46,9 @@ let secondsLeft  = PHASES[0].minutes * 60;
 let totalSeconds = PHASES[0].minutes * 60;
 let running      = false;
 let intervalId   = null;
+let lastTickMs   = null;
+
+const TICK_INTERVAL_MS = 1000;
 
 // ─── DOM refs ──────────────────────────────────────────────────────────────
 
@@ -183,35 +186,62 @@ function updateDisplay() {
 function loadPhase(index, animate) {
   phaseIndex   = index;
   const phase  = PHASES[index];
-  totalSeconds = phase.minutes * 60;
+  totalSeconds = Math.max(1, phase.minutes * 60);
   secondsLeft  = totalSeconds;
 
   applyPhaseUI(phase, animate);
   updateDisplay();
 }
 
-function nextPhase() {
+function nextPhase(withSignal = true) {
   const nextIndex = (phaseIndex + 1) % PHASES.length;
   if (nextIndex === 0) loopCount++;
   loadPhase(nextIndex, true);
-  playPhaseChime();
+  if (withSignal) playPhaseChime();
 }
 
 // ─── Tick ──────────────────────────────────────────────────────────────────
 
-function tick() {
-  if (secondsLeft <= 0) {
-    nextPhase();
-    return;
-  }
+function consumeSeconds(secondsToConsume, withSignals) {
+  let warningPlayed = false;
+  let transitionAttempts = 0;
 
-  // Warning sound at exactly 30 s remaining
-  if (secondsLeft === 30) {
-    playWarningBeep();
+  while (secondsToConsume > 0) {
+    if (secondsLeft <= 0) {
+      nextPhase(withSignals);
+      transitionAttempts++;
+      if (secondsLeft <= 0 && transitionAttempts >= PHASES.length) {
+        break;
+      }
+      continue;
+    } else {
+      transitionAttempts = 0;
+      const nextSecondsLeft = secondsLeft - 1;
+      const crossedWarningThreshold = secondsLeft >= 30 && nextSecondsLeft < 30;
+      if (withSignals && !warningPlayed && crossedWarningThreshold) {
+        playWarningBeep();
+        warningPlayed = true;
+      }
+      secondsLeft--;
+      secondsToConsume--;
+    }
   }
-
-  secondsLeft--;
   updateDisplay();
+}
+
+function syncElapsedTime() {
+  if (!running || lastTickMs === null) return;
+
+  const now = Date.now();
+  const elapsedSeconds = Math.floor((now - lastTickMs) / 1000);
+  if (elapsedSeconds <= 0) return;
+
+  lastTickMs += elapsedSeconds * 1000;
+  consumeSeconds(elapsedSeconds, true);
+}
+
+function tick() {
+  syncElapsedTime();
 }
 
 // ─── Controls ──────────────────────────────────────────────────────────────
@@ -219,16 +249,19 @@ function tick() {
 function startTimer() {
   if (running) return;
   running    = true;
-  intervalId = setInterval(tick, 1000);
+  lastTickMs = Date.now();
+  intervalId = setInterval(tick, TICK_INTERVAL_MS);
   startStopBtn.textContent = '⏸ Pause';
   startStopBtn.setAttribute('aria-label', 'Pause timer');
 }
 
 function pauseTimer() {
   if (!running) return;
+  syncElapsedTime();
   clearInterval(intervalId);
   intervalId = null;
   running    = false;
+  lastTickMs = null;
   startStopBtn.textContent = '▶ Resume';
   startStopBtn.setAttribute('aria-label', 'Resume timer');
 }
@@ -256,6 +289,12 @@ skipBtn.addEventListener('click', () => {
   pauseTimer();
   nextPhase();
   if (wasRunning) startTimer();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    syncElapsedTime();
+  }
 });
 
 // ─── Keyboard shortcuts ────────────────────────────────────────────────────
