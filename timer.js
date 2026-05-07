@@ -186,7 +186,7 @@ function updateDisplay() {
 function loadPhase(index, animate) {
   phaseIndex   = index;
   const phase  = PHASES[index];
-  totalSeconds = phase.minutes * 60;
+  totalSeconds = Math.max(1, phase.minutes * 60);
   secondsLeft  = totalSeconds;
 
   applyPhaseUI(phase, animate);
@@ -216,8 +216,9 @@ function consumeSeconds(secondsToConsume, withSignals) {
       continue;
     } else {
       transitionAttempts = 0;
-      // Warning sound at exactly 30 s remaining
-      if (withSignals && !warningPlayed && secondsLeft === 30) {
+      const nextSecondsLeft = secondsLeft - 1;
+      const crossedWarningThreshold = secondsLeft >= 30 && nextSecondsLeft < 30;
+      if (withSignals && !warningPlayed && crossedWarningThreshold) {
         playWarningBeep();
         warningPlayed = true;
       }
