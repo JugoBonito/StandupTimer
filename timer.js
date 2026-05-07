@@ -48,6 +48,7 @@ let running      = false;
 let intervalId   = null;
 let lastTickMs   = null;
 
+// Run faster than 1s so elapsed-time catch-up applies quickly after throttling.
 const TICK_INTERVAL_MS = 250;
 
 // ─── DOM refs ──────────────────────────────────────────────────────────────
@@ -204,16 +205,18 @@ function nextPhase(withSignal = true) {
 
 function consumeSeconds(secondsToConsume, withSignals) {
   let warningPlayed = false;
+  let transitionAttempts = 0;
 
   while (secondsToConsume > 0) {
     if (secondsLeft <= 0) {
-      const previousSecondsLeft = secondsLeft;
       nextPhase(withSignals);
-      if (secondsLeft <= 0 || secondsLeft === previousSecondsLeft) {
-        secondsToConsume--;
+      transitionAttempts++;
+      if (secondsLeft <= 0 && transitionAttempts > PHASES.length) {
+        break;
       }
       continue;
     } else {
+      transitionAttempts = 0;
       // Warning sound at exactly 30 s remaining
       if (withSignals && !warningPlayed && secondsLeft === 30) {
         playWarningBeep();
