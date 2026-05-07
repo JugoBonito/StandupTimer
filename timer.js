@@ -193,27 +193,31 @@ function loadPhase(index, animate) {
   updateDisplay();
 }
 
-function nextPhase() {
+function nextPhase(withSignal = true) {
   const nextIndex = (phaseIndex + 1) % PHASES.length;
   if (nextIndex === 0) loopCount++;
   loadPhase(nextIndex, true);
-  playPhaseChime();
+  if (withSignal) playPhaseChime();
 }
 
 // ─── Tick ──────────────────────────────────────────────────────────────────
 
 function consumeSeconds(secondsToConsume, withSignals) {
+  let warningPlayed = false;
+
   while (secondsToConsume > 0) {
     if (secondsLeft <= 0) {
-      nextPhase();
+      nextPhase(withSignals);
+      continue;
     } else {
       // Warning sound at exactly 30 s remaining
-      if (withSignals && secondsLeft === 30) {
+      if (!warningPlayed && secondsLeft === 30) {
         playWarningBeep();
+        warningPlayed = true;
       }
       secondsLeft--;
+      secondsToConsume--;
     }
-    secondsToConsume--;
   }
   updateDisplay();
 }
