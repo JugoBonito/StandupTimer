@@ -48,8 +48,7 @@ let running      = false;
 let intervalId   = null;
 let lastTickMs   = null;
 
-// Run faster than 1s so elapsed-time catch-up applies quickly after throttling.
-const TICK_INTERVAL_MS = 250;
+const TICK_INTERVAL_MS = 1000;
 
 // ─── DOM refs ──────────────────────────────────────────────────────────────
 
@@ -211,7 +210,7 @@ function consumeSeconds(secondsToConsume, withSignals) {
     if (secondsLeft <= 0) {
       nextPhase(withSignals);
       transitionAttempts++;
-      if (secondsLeft <= 0 && transitionAttempts > PHASES.length) {
+      if (secondsLeft <= 0 && transitionAttempts >= PHASES.length) {
         break;
       }
       continue;
