@@ -207,11 +207,15 @@ function consumeSeconds(secondsToConsume, withSignals) {
 
   while (secondsToConsume > 0) {
     if (secondsLeft <= 0) {
+      const previousSecondsLeft = secondsLeft;
       nextPhase(withSignals);
+      if (secondsLeft <= 0 || secondsLeft === previousSecondsLeft) {
+        secondsToConsume--;
+      }
       continue;
     } else {
       // Warning sound at exactly 30 s remaining
-      if (!warningPlayed && secondsLeft === 30) {
+      if (withSignals && !warningPlayed && secondsLeft === 30) {
         playWarningBeep();
         warningPlayed = true;
       }
@@ -230,7 +234,7 @@ function syncElapsedTime() {
   if (elapsedSeconds <= 0) return;
 
   lastTickMs += elapsedSeconds * 1000;
-  consumeSeconds(elapsedSeconds, elapsedSeconds === 1);
+  consumeSeconds(elapsedSeconds, true);
 }
 
 function tick() {
