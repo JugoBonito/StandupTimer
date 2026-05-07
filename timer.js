@@ -46,6 +46,9 @@ let secondsLeft  = PHASES[0].minutes * 60;
 let totalSeconds = PHASES[0].minutes * 60;
 let running      = false;
 let intervalId   = null;
+let lastTickMs   = null;
+
+const TICK_INTERVAL_MS = 250;
 
 // ─── DOM refs ──────────────────────────────────────────────────────────────
 
@@ -199,19 +202,35 @@ function nextPhase() {
 
 // ─── Tick ──────────────────────────────────────────────────────────────────
 
-function tick() {
-  if (secondsLeft <= 0) {
-    nextPhase();
-    return;
+function consumeSeconds(secondsToConsume, withSignals) {
+  while (secondsToConsume > 0) {
+    if (secondsLeft <= 0) {
+      nextPhase();
+    } else {
+      // Warning sound at exactly 30 s remaining
+      if (withSignals && secondsLeft === 30) {
+        playWarningBeep();
+      }
+      secondsLeft--;
+    }
+    secondsToConsume--;
   }
-
-  // Warning sound at exactly 30 s remaining
-  if (secondsLeft === 30) {
-    playWarningBeep();
-  }
-
-  secondsLeft--;
   updateDisplay();
+}
+
+function syncElapsedTime() {
+  if (!running || lastTickMs === null) return;
+
+  const now = Date.now();
+  const elapsedSeconds = Math.floor((now - lastTickMs) / 1000);
+  if (elapsedSeconds <= 0) return;
+
+  lastTickMs += elapsedSeconds * 1000;
+  consumeSeconds(elapsedSeconds, elapsedSeconds === 1);
+}
+
+function tick() {
+  syncElapsedTime();
 }
 
 // ─── Controls ──────────────────────────────────────────────────────────────
@@ -219,16 +238,19 @@ function tick() {
 function startTimer() {
   if (running) return;
   running    = true;
-  intervalId = setInterval(tick, 1000);
+  lastTickMs = Date.now();
+  intervalId = setInterval(tick, TICK_INTERVAL_MS);
   startStopBtn.textContent = '⏸ Pause';
   startStopBtn.setAttribute('aria-label', 'Pause timer');
 }
 
 function pauseTimer() {
   if (!running) return;
+  syncElapsedTime();
   clearInterval(intervalId);
   intervalId = null;
   running    = false;
+  lastTickMs = null;
   startStopBtn.textContent = '▶ Resume';
   startStopBtn.setAttribute('aria-label', 'Resume timer');
 }
@@ -256,6 +278,12 @@ skipBtn.addEventListener('click', () => {
   pauseTimer();
   nextPhase();
   if (wasRunning) startTimer();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    syncElapsedTime();
+  }
 });
 
 // ─── Keyboard shortcuts ────────────────────────────────────────────────────
