@@ -24,6 +24,7 @@ After the **Moving** phase the timer automatically restarts at **Sitting** — r
 - **Reset** button to return to the start
 - Keeps accurate time even when the browser tab is inactive/throttled
 - Loop counter so you can track your cycles
+- Moving phase exercise prompts with standing-friendly suggestions
 - Keyboard shortcuts: `Space` = pause/resume, `R` = reset, `S` = skip
 - Mute toggle to silence audio notifications
 

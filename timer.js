@@ -38,6 +38,20 @@ const PHASES = [
   },
 ];
 
+const MOVE_EXERCISES = [
+  'March in place',
+  'Standing side bends',
+  'Standing torso twists',
+  'Shoulder rolls',
+  'Arm circles',
+  'Calf raises',
+  'Heel-toe rocks',
+  'Neck stretches',
+  'Hip circles',
+  'Standing quad stretch',
+  'Standing hamstring stretch',
+];
+
 // ─── State ─────────────────────────────────────────────────────────────────
 
 let phaseIndex   = 0;
@@ -47,6 +61,7 @@ let totalSeconds = PHASES[0].minutes * 60;
 let running      = false;
 let intervalId   = null;
 let lastTickMs   = null;
+let lastMoveExerciseIndex = -1;
 
 const TICK_INTERVAL_MS = 1000;
 
@@ -57,6 +72,7 @@ const phaseIcon     = document.getElementById('phaseIcon');
 const phaseLabel    = document.getElementById('phaseLabel');
 const timerDisplay  = document.getElementById('timerDisplay');
 const phaseSubtext  = document.getElementById('phaseSubtext');
+const exerciseSuggestion = document.getElementById('exerciseSuggestion');
 const progressBar   = document.getElementById('progressBar');
 const loopCountEl   = document.getElementById('loopCount');
 const startStopBtn  = document.getElementById('startStopBtn');
@@ -141,6 +157,18 @@ function formatTime(seconds) {
   return `${m}:${s}`;
 }
 
+function pickMoveExercise() {
+  if (!MOVE_EXERCISES.length) return '';
+  let nextIndex = Math.floor(Math.random() * MOVE_EXERCISES.length);
+  if (MOVE_EXERCISES.length > 1) {
+    while (nextIndex === lastMoveExerciseIndex) {
+      nextIndex = Math.floor(Math.random() * MOVE_EXERCISES.length);
+    }
+  }
+  lastMoveExerciseIndex = nextIndex;
+  return MOVE_EXERCISES[nextIndex];
+}
+
 function applyPhaseUI(phase, animate = false) {
   // Card class
   phaseCard.className = `phase-card ${phase.key}`;
@@ -152,6 +180,15 @@ function applyPhaseUI(phase, animate = false) {
   phaseIcon.textContent    = phase.icon;
   phaseLabel.textContent   = phase.label;
   phaseSubtext.textContent = phase.subtext;
+
+  if (phase.key === 'move') {
+    const exercise = pickMoveExercise();
+    exerciseSuggestion.textContent = exercise ? `Try: ${exercise}` : '';
+    exerciseSuggestion.hidden = false;
+  } else {
+    exerciseSuggestion.textContent = '';
+    exerciseSuggestion.hidden = true;
+  }
 
   // Progress bar colour
   progressBar.style.background = phase.accent;

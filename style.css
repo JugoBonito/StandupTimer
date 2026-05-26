@@ -104,6 +104,18 @@ body {
   margin-top: 4px;
 }
 
+.exercise-suggestion {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.phase-card.move .exercise-suggestion {
+  color: var(--accent-move);
+}
+
 /* ---- Progress bar ---- */
 .progress-bar-container {
   width: 100%;
