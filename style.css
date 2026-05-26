@@ -104,6 +104,26 @@ body {
   margin-top: 4px;
 }
 
+.exercise-gif-wrap {
+  width: 100%;
+  max-width: 320px;
+  margin-top: 8px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #2e3045;
+  background: #121521;
+}
+
+.exercise-gif {
+  width: 100%;
+  display: block;
+  height: auto;
+}
+
+.hidden {
+  display: none;
+}
+
 /* ---- Progress bar ---- */
 .progress-bar-container {
   width: 100%;
