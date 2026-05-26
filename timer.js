@@ -38,12 +38,24 @@ const PHASES = [
   },
 ];
 
+const MOVE_EXERCISES_STANDING = [
+  'March in place',
+  'Heel raises',
+  'Shoulder rolls',
+  'Standing side bends',
+  'Arm circles',
+  'Calf stretch at desk',
+  'Standing torso twists',
+  'Step touch side to side',
+];
+
 // ─── State ─────────────────────────────────────────────────────────────────
 
 let phaseIndex   = 0;
 let loopCount    = 1;
 let secondsLeft  = PHASES[0].minutes * 60;
 let totalSeconds = PHASES[0].minutes * 60;
+let currentMoveExercise = null;
 let running      = false;
 let intervalId   = null;
 let lastTickMs   = null;
@@ -141,6 +153,11 @@ function formatTime(seconds) {
   return `${m}:${s}`;
 }
 
+function getRandomMoveExercise() {
+  const randomIndex = Math.floor(Math.random() * MOVE_EXERCISES_STANDING.length);
+  return MOVE_EXERCISES_STANDING[randomIndex];
+}
+
 function applyPhaseUI(phase, animate = false) {
   // Card class
   phaseCard.className = `phase-card ${phase.key}`;
@@ -151,7 +168,9 @@ function applyPhaseUI(phase, animate = false) {
 
   phaseIcon.textContent    = phase.icon;
   phaseLabel.textContent   = phase.label;
-  phaseSubtext.textContent = phase.subtext;
+  phaseSubtext.textContent = phase.key === 'move'
+    ? `${phase.subtext} Try: ${currentMoveExercise}`
+    : phase.subtext;
 
   // Progress bar colour
   progressBar.style.background = phase.accent;
@@ -188,6 +207,7 @@ function loadPhase(index, animate) {
   const phase  = PHASES[index];
   totalSeconds = Math.max(1, phase.minutes * 60);
   secondsLeft  = totalSeconds;
+  currentMoveExercise = phase.key === 'move' ? getRandomMoveExercise() : null;
 
   applyPhaseUI(phase, animate);
   updateDisplay();
