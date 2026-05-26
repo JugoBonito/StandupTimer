@@ -175,7 +175,7 @@ function updateExerciseGif(phaseKey) {
   const isMovePhase = phaseKey === 'move' && currentMoveExercise;
   if (!isMovePhase) {
     exerciseGifWrap.classList.add('hidden');
-    exerciseGif.removeAttribute('src');
+    exerciseGif.src = '';
     exerciseGif.alt = '';
     return;
   }
@@ -183,7 +183,7 @@ function updateExerciseGif(phaseKey) {
   const gifSrc = MOVE_EXERCISE_GIFS[currentMoveExercise];
   if (!gifSrc) {
     exerciseGifWrap.classList.add('hidden');
-    exerciseGif.removeAttribute('src');
+    exerciseGif.src = '';
     exerciseGif.alt = '';
     return;
   }
