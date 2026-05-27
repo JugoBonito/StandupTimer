@@ -49,6 +49,17 @@ const MOVE_EXERCISES_STANDING = [
   'Step touch side to side',
 ];
 
+const MOVE_EXERCISE_GIFS = {
+  'March in place': 'assets/exercises/march-in-place.gif',
+  'Heel raises': 'assets/exercises/heel-raises.gif',
+  'Shoulder rolls': 'assets/exercises/shoulder-rolls.gif',
+  'Standing side bends': 'assets/exercises/standing-side-bends.gif',
+  'Arm circles': 'assets/exercises/arm-circles.gif',
+  'Calf stretch at desk': 'assets/exercises/calf-stretch-at-desk.gif',
+  'Standing torso twists': 'assets/exercises/standing-torso-twists.gif',
+  'Step touch side to side': 'assets/exercises/step-touch-side-to-side.gif',
+};
+
 // ─── State ─────────────────────────────────────────────────────────────────
 
 let phaseIndex   = 0;
@@ -69,6 +80,8 @@ const phaseIcon     = document.getElementById('phaseIcon');
 const phaseLabel    = document.getElementById('phaseLabel');
 const timerDisplay  = document.getElementById('timerDisplay');
 const phaseSubtext  = document.getElementById('phaseSubtext');
+const exerciseGifWrap = document.getElementById('exerciseGifWrap');
+const exerciseGif   = document.getElementById('exerciseGif');
 const progressBar   = document.getElementById('progressBar');
 const loopCountEl   = document.getElementById('loopCount');
 const startStopBtn  = document.getElementById('startStopBtn');
@@ -158,6 +171,28 @@ function getRandomMoveExercise() {
   return MOVE_EXERCISES_STANDING[randomIndex];
 }
 
+function updateExerciseGif(phaseKey) {
+  const isMovePhase = phaseKey === 'move' && currentMoveExercise;
+  if (!isMovePhase) {
+    exerciseGifWrap.classList.add('hidden');
+    exerciseGif.src = '';
+    exerciseGif.alt = '';
+    return;
+  }
+
+  const gifSrc = MOVE_EXERCISE_GIFS[currentMoveExercise];
+  if (!gifSrc) {
+    exerciseGifWrap.classList.add('hidden');
+    exerciseGif.src = '';
+    exerciseGif.alt = '';
+    return;
+  }
+
+  exerciseGif.src = gifSrc;
+  exerciseGif.alt = `${currentMoveExercise} demonstration`;
+  exerciseGifWrap.classList.remove('hidden');
+}
+
 function applyPhaseUI(phase, animate = false) {
   // Card class
   phaseCard.className = `phase-card ${phase.key}`;
@@ -171,6 +206,7 @@ function applyPhaseUI(phase, animate = false) {
   phaseSubtext.textContent = phase.key === 'move'
     ? `${phase.subtext} Try: ${currentMoveExercise}`
     : phase.subtext;
+  updateExerciseGif(phase.key);
 
   // Progress bar colour
   progressBar.style.background = phase.accent;

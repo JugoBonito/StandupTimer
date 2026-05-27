@@ -22,6 +22,7 @@ After the **Moving** phase the timer automatically restarts at **Sitting** — r
 - **Skip** button to jump to the next phase immediately
 - **Pause / Resume** support
 - **Reset** button to return to the start
+- Animated GIF demo for each move-phase exercise
 - Keeps accurate time even when the browser tab is inactive/throttled
 - Loop counter so you can track your cycles
 - Keyboard shortcuts: `Space` = pause/resume, `R` = reset, `S` = skip
