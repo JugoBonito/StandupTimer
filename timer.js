@@ -70,17 +70,17 @@ let running      = false;
 let intervalId   = null;
 let warningPlayedForPhase = false;
 
+let skipOffsetSeconds = 0;
+let lastRealDateString = new Date().toDateString();
+
 const TICK_INTERVAL_MS = 1000;
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const BREAK_START_HOUR = 11;
-const BREAK_START_MINUTE = 30;
-const BREAK_END_HOUR = 12;
-const BREAK_END_MINUTE = 30;
-
-const BREAK_START_SECONDS = BREAK_START_HOUR * 3600 + BREAK_START_MINUTE * 60;
-const BREAK_END_SECONDS = BREAK_END_HOUR * 3600 + BREAK_END_MINUTE * 60;
+const BREAK_SIT_START_M = 11 * 60 + 20;
+const BREAK_END_M = 12 * 60 + 30;
+const MINUTES_PER_DAY = 24 * 60;
+const SECONDS_PER_DAY = 24 * 3600;
 
 // ─── DOM refs ──────────────────────────────────────────────────────────────
 
@@ -93,6 +93,8 @@ const exerciseGifWrap = document.getElementById('exerciseGifWrap');
 const exerciseGif   = document.getElementById('exerciseGif');
 const progressBar   = document.getElementById('progressBar');
 const startStopBtn  = document.getElementById('startStopBtn');
+const resetBtn      = document.getElementById('resetBtn');
+const skipBtn       = document.getElementById('skipBtn');
 const muteCheckbox  = document.getElementById('muteCheckbox');
 
 const stepEls = [
@@ -243,56 +245,70 @@ function updateDisplay() {
 // ─── Time calculation ──────────────────────────────────────────────────────
 
 function getPhaseForTime(date) {
+  if (date.toDateString() !== lastRealDateString) {
+    skipOffsetSeconds = 0;
+    lastRealDateString = date.toDateString();
+  }
+
   const h = date.getHours();
   const m = date.getMinutes();
   const s = date.getSeconds();
-  const totalMins = h * 60 + m;
-  const currentTotalSeconds = totalMins * 60 + s;
-
-  // Break from 11:30 to 12:30
-  if (currentTotalSeconds >= BREAK_START_SECONDS && currentTotalSeconds < BREAK_END_SECONDS) {
+  const realSeconds = h * 3600 + m * 60 + s;
+  
+  const virtualSeconds = ((realSeconds + skipOffsetSeconds) % SECONDS_PER_DAY + SECONDS_PER_DAY) % SECONDS_PER_DAY;
+  
+  const vt_m = Math.floor(virtualSeconds / 60);
+  
+  if (vt_m >= BREAK_SIT_START_M && vt_m < BREAK_END_M) {
+    // 11:20 to 12:30 is SIT
     return {
       index: 0,
-      totalSeconds: BREAK_END_SECONDS - BREAK_START_SECONDS,
-      secondsLeft: BREAK_END_SECONDS - currentTotalSeconds
+      totalSeconds: (BREAK_END_M - BREAK_SIT_START_M) * 60,
+      secondsLeft: BREAK_END_M * 60 - virtualSeconds
     };
   }
-
-  if (m < 15) {
-    const endSeconds = h * 3600 + 15 * 60;
+  
+  let cycleStartOffsetM = 0;
+  if (vt_m >= BREAK_END_M) {
+    cycleStartOffsetM = 30;
+  }
+  
+  let shiftedM = vt_m - cycleStartOffsetM;
+  let cycleHourM = Math.floor(shiftedM / 60) * 60 + cycleStartOffsetM;
+  let mInCycle = vt_m - cycleHourM;
+  
+  if (mInCycle < 15) {
     return {
-      index: 1,
+      index: 1, // Stand
       totalSeconds: 15 * 60,
-      secondsLeft: endSeconds - currentTotalSeconds
+      secondsLeft: (cycleHourM + 15) * 60 - virtualSeconds
     };
-  } else if (m >= 15 && m < 20) {
-    const endSeconds = h * 3600 + 20 * 60;
+  } else if (mInCycle < 20) {
     return {
-      index: 2,
+      index: 2, // Move
       totalSeconds: 5 * 60,
-      secondsLeft: endSeconds - currentTotalSeconds
+      secondsLeft: (cycleHourM + 20) * 60 - virtualSeconds
     };
   } else {
-    // sit: m >= 20 to 60
-    let endSeconds = (h + 1) * 3600;
-    let durationSeconds = 40 * 60;
-    
-    if (h === BREAK_START_HOUR && m < BREAK_START_MINUTE) {
-      endSeconds = BREAK_START_SECONDS;
-      durationSeconds = BREAK_START_SECONDS - (h * 3600 + 20 * 60);
-    } else if (h === BREAK_END_HOUR && m >= BREAK_END_MINUTE) {
-      durationSeconds = (h + 1) * 3600 - BREAK_END_SECONDS;
+    // Sit
+    let endM = cycleHourM + 60;
+    if (endM > MINUTES_PER_DAY) {
+      endM = MINUTES_PER_DAY;
     }
     
     return {
       index: 0,
-      totalSeconds: durationSeconds,
-      secondsLeft: endSeconds - currentTotalSeconds
+      totalSeconds: (endM - (cycleHourM + 20)) * 60,
+      secondsLeft: endM * 60 - virtualSeconds
     };
   }
 }
 
 // ─── Phase transitions ─────────────────────────────────────────────────────
+
+function shouldPlayWarning(animate) {
+  return secondsLeft <= 30 && secondsLeft > 0 && !warningPlayedForPhase && running && animate;
+}
 
 function checkAndLoadPhase(animate = false) {
   const now = new Date();
@@ -317,7 +333,7 @@ function checkAndLoadPhase(animate = false) {
     if (running && animate) {
       playPhaseChime();
     }
-  } else if (secondsLeft <= 30 && secondsLeft > 0 && !warningPlayedForPhase && running && animate) {
+  } else if (shouldPlayWarning(animate)) {
     playWarningBeep();
     warningPlayedForPhase = true;
   }
@@ -365,6 +381,18 @@ startStopBtn.addEventListener('click', () => {
   else         startTimer();
 });
 
+resetBtn.addEventListener('click', () => {
+  skipOffsetSeconds = 0;
+  checkAndLoadPhase(true);
+});
+
+skipBtn.addEventListener('click', () => {
+  const now = new Date();
+  const phaseInfo = getPhaseForTime(now);
+  skipOffsetSeconds += phaseInfo.secondsLeft;
+  checkAndLoadPhase(true);
+});
+
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && running) {
     checkAndLoadPhase(false);
@@ -378,6 +406,12 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (running) pauseTimer();
     else         startTimer();
+  }
+  if (e.code === 'KeyR' && e.target === document.body) {
+    resetBtn.click();
+  }
+  if (e.code === 'KeyS' && e.target === document.body) {
+    skipBtn.click();
   }
 });
 
