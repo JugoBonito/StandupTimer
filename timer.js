@@ -62,16 +62,25 @@ const MOVE_EXERCISE_GIFS = {
 
 // ─── State ─────────────────────────────────────────────────────────────────
 
-let phaseIndex   = 0;
-let loopCount    = 1;
-let secondsLeft  = PHASES[0].minutes * 60;
-let totalSeconds = PHASES[0].minutes * 60;
+let phaseIndex   = -1;
+let secondsLeft  = 0;
+let totalSeconds = 0;
 let currentMoveExercise = null;
 let running      = false;
 let intervalId   = null;
-let lastTickMs   = null;
+let warningPlayedForPhase = false;
 
 const TICK_INTERVAL_MS = 1000;
+
+// ─── Constants ─────────────────────────────────────────────────────────────
+
+const BREAK_START_HOUR = 11;
+const BREAK_START_MINUTE = 30;
+const BREAK_END_HOUR = 12;
+const BREAK_END_MINUTE = 30;
+
+const BREAK_START_SECONDS = BREAK_START_HOUR * 3600 + BREAK_START_MINUTE * 60;
+const BREAK_END_SECONDS = BREAK_END_HOUR * 3600 + BREAK_END_MINUTE * 60;
 
 // ─── DOM refs ──────────────────────────────────────────────────────────────
 
@@ -83,10 +92,7 @@ const phaseSubtext  = document.getElementById('phaseSubtext');
 const exerciseGifWrap = document.getElementById('exerciseGifWrap');
 const exerciseGif   = document.getElementById('exerciseGif');
 const progressBar   = document.getElementById('progressBar');
-const loopCountEl   = document.getElementById('loopCount');
 const startStopBtn  = document.getElementById('startStopBtn');
-const resetBtn      = document.getElementById('resetBtn');
-const skipBtn       = document.getElementById('skipBtn');
 const muteCheckbox  = document.getElementById('muteCheckbox');
 
 const stepEls = [
@@ -232,103 +238,124 @@ function updateDisplay() {
   // Warning flash in last 30 s
   const isWarning = secondsLeft <= 30 && secondsLeft > 0;
   phaseCard.classList.toggle('warning', isWarning);
+}
 
-  loopCountEl.textContent = loopCount;
+// ─── Time calculation ──────────────────────────────────────────────────────
+
+function getPhaseForTime(date) {
+  const h = date.getHours();
+  const m = date.getMinutes();
+  const s = date.getSeconds();
+  const totalMins = h * 60 + m;
+  const currentTotalSeconds = totalMins * 60 + s;
+
+  // Break from 11:30 to 12:30
+  if (currentTotalSeconds >= BREAK_START_SECONDS && currentTotalSeconds < BREAK_END_SECONDS) {
+    return {
+      index: 0,
+      totalSeconds: BREAK_END_SECONDS - BREAK_START_SECONDS,
+      secondsLeft: BREAK_END_SECONDS - currentTotalSeconds
+    };
+  }
+
+  if (m < 15) {
+    const endSeconds = h * 3600 + 15 * 60;
+    return {
+      index: 1,
+      totalSeconds: 15 * 60,
+      secondsLeft: endSeconds - currentTotalSeconds
+    };
+  } else if (m >= 15 && m < 20) {
+    const endSeconds = h * 3600 + 20 * 60;
+    return {
+      index: 2,
+      totalSeconds: 5 * 60,
+      secondsLeft: endSeconds - currentTotalSeconds
+    };
+  } else {
+    // sit: m >= 20 to 60
+    let endSeconds = (h + 1) * 3600;
+    let durationSeconds = 40 * 60;
+    
+    if (h === BREAK_START_HOUR && m < BREAK_START_MINUTE) {
+      endSeconds = BREAK_START_SECONDS;
+      durationSeconds = BREAK_START_SECONDS - (h * 3600 + 20 * 60);
+    } else if (h === BREAK_END_HOUR && m >= BREAK_END_MINUTE) {
+      durationSeconds = (h + 1) * 3600 - BREAK_END_SECONDS;
+    }
+    
+    return {
+      index: 0,
+      totalSeconds: durationSeconds,
+      secondsLeft: endSeconds - currentTotalSeconds
+    };
+  }
 }
 
 // ─── Phase transitions ─────────────────────────────────────────────────────
 
-function loadPhase(index, animate) {
-  phaseIndex   = index;
-  const phase  = PHASES[index];
-  totalSeconds = Math.max(1, phase.minutes * 60);
-  secondsLeft  = totalSeconds;
-  currentMoveExercise = phase.key === 'move' ? getRandomMoveExercise() : null;
+function checkAndLoadPhase(animate = false) {
+  const now = new Date();
+  const phaseInfo = getPhaseForTime(now);
+  
+  totalSeconds = phaseInfo.totalSeconds;
+  secondsLeft = phaseInfo.secondsLeft;
 
-  applyPhaseUI(phase, animate);
+  if (phaseInfo.index !== phaseIndex) {
+    phaseIndex = phaseInfo.index;
+    warningPlayedForPhase = false;
+    const phase = PHASES[phaseIndex];
+    if (phase.key === 'move') {
+      currentMoveExercise = getRandomMoveExercise();
+    } else {
+      currentMoveExercise = null;
+    }
+    
+    applyPhaseUI(phase, animate);
+    
+    // Play sound if running
+    if (running && animate) {
+      playPhaseChime();
+    }
+  } else if (secondsLeft <= 30 && secondsLeft > 0 && !warningPlayedForPhase && running && animate) {
+    playWarningBeep();
+    warningPlayedForPhase = true;
+  }
+
   updateDisplay();
-}
-
-function nextPhase(withSignal = true) {
-  const nextIndex = (phaseIndex + 1) % PHASES.length;
-  if (nextIndex === 0) loopCount++;
-  loadPhase(nextIndex, true);
-  if (withSignal) playPhaseChime();
 }
 
 // ─── Tick ──────────────────────────────────────────────────────────────────
 
-function consumeSeconds(secondsToConsume, withSignals) {
-  let warningPlayed = false;
-  let transitionAttempts = 0;
-
-  while (secondsToConsume > 0) {
-    if (secondsLeft <= 0) {
-      nextPhase(withSignals);
-      transitionAttempts++;
-      if (secondsLeft <= 0 && transitionAttempts >= PHASES.length) {
-        break;
-      }
-      continue;
-    } else {
-      transitionAttempts = 0;
-      const nextSecondsLeft = secondsLeft - 1;
-      const crossedWarningThreshold = secondsLeft >= 30 && nextSecondsLeft < 30;
-      if (withSignals && !warningPlayed && crossedWarningThreshold) {
-        playWarningBeep();
-        warningPlayed = true;
-      }
-      secondsLeft--;
-      secondsToConsume--;
-    }
-  }
-  updateDisplay();
-}
-
-function syncElapsedTime() {
-  if (!running || lastTickMs === null) return;
-
-  const now = Date.now();
-  const elapsedSeconds = Math.floor((now - lastTickMs) / 1000);
-  if (elapsedSeconds <= 0) return;
-
-  lastTickMs += elapsedSeconds * 1000;
-  consumeSeconds(elapsedSeconds, true);
-}
-
 function tick() {
-  syncElapsedTime();
+  if (running) {
+    checkAndLoadPhase(true);
+  }
 }
 
 // ─── Controls ──────────────────────────────────────────────────────────────
 
 function startTimer() {
   if (running) return;
-  running    = true;
-  lastTickMs = Date.now();
+  
+  // Browsers require interaction to play audio. 
+  // We can init audio context here.
+  getAudioContext();
+  
+  running = true;
+  checkAndLoadPhase(false);
   intervalId = setInterval(tick, TICK_INTERVAL_MS);
-  startStopBtn.textContent = '⏸ Pause';
-  startStopBtn.setAttribute('aria-label', 'Pause timer');
+  startStopBtn.textContent = '⏸ Pause Tracking';
+  startStopBtn.setAttribute('aria-label', 'Pause tracking');
 }
 
 function pauseTimer() {
   if (!running) return;
-  syncElapsedTime();
   clearInterval(intervalId);
   intervalId = null;
   running    = false;
-  lastTickMs = null;
-  startStopBtn.textContent = '▶ Resume';
-  startStopBtn.setAttribute('aria-label', 'Resume timer');
-}
-
-function resetTimer() {
-  pauseTimer();
-  phaseIndex = 0;
-  loopCount  = 1;
-  loadPhase(0, false);
-  startStopBtn.textContent = '▶ Start';
-  startStopBtn.setAttribute('aria-label', 'Start timer');
+  startStopBtn.textContent = '▶ Start Tracking';
+  startStopBtn.setAttribute('aria-label', 'Start tracking');
 }
 
 // ─── Event listeners ───────────────────────────────────────────────────────
@@ -338,18 +365,9 @@ startStopBtn.addEventListener('click', () => {
   else         startTimer();
 });
 
-resetBtn.addEventListener('click', resetTimer);
-
-skipBtn.addEventListener('click', () => {
-  const wasRunning = running;
-  pauseTimer();
-  nextPhase();
-  if (wasRunning) startTimer();
-});
-
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    syncElapsedTime();
+  if (!document.hidden && running) {
+    checkAndLoadPhase(false);
   }
 });
 
@@ -361,14 +379,8 @@ document.addEventListener('keydown', (e) => {
     if (running) pauseTimer();
     else         startTimer();
   }
-  if (e.code === 'KeyR' && e.target === document.body) {
-    resetTimer();
-  }
-  if (e.code === 'KeyS' && e.target === document.body) {
-    skipBtn.click();
-  }
 });
 
 // ─── Init ──────────────────────────────────────────────────────────────────
 
-loadPhase(0, false);
+checkAndLoadPhase(false);
