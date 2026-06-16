@@ -62,16 +62,25 @@ const MOVE_EXERCISE_GIFS = {
 
 // ─── State ─────────────────────────────────────────────────────────────────
 
-let phaseIndex   = 0;
-let loopCount    = 1;
-let secondsLeft  = PHASES[0].minutes * 60;
-let totalSeconds = PHASES[0].minutes * 60;
+let phaseIndex   = -1;
+let secondsLeft  = 0;
+let totalSeconds = 0;
 let currentMoveExercise = null;
 let running      = false;
 let intervalId   = null;
-let lastTickMs   = null;
+let warningPlayedForPhase = false;
+
+let skipOffsetSeconds = 0;
+let lastRealDateString = new Date().toDateString();
 
 const TICK_INTERVAL_MS = 1000;
+
+// ─── Constants ─────────────────────────────────────────────────────────────
+
+const BREAK_SIT_START_M = 11 * 60 + 20;
+const BREAK_END_M = 12 * 60 + 30;
+const MINUTES_PER_DAY = 24 * 60;
+const SECONDS_PER_DAY = 24 * 3600;
 
 // ─── DOM refs ──────────────────────────────────────────────────────────────
 
@@ -83,7 +92,6 @@ const phaseSubtext  = document.getElementById('phaseSubtext');
 const exerciseGifWrap = document.getElementById('exerciseGifWrap');
 const exerciseGif   = document.getElementById('exerciseGif');
 const progressBar   = document.getElementById('progressBar');
-const loopCountEl   = document.getElementById('loopCount');
 const startStopBtn  = document.getElementById('startStopBtn');
 const resetBtn      = document.getElementById('resetBtn');
 const skipBtn       = document.getElementById('skipBtn');
@@ -232,103 +240,138 @@ function updateDisplay() {
   // Warning flash in last 30 s
   const isWarning = secondsLeft <= 30 && secondsLeft > 0;
   phaseCard.classList.toggle('warning', isWarning);
+}
 
-  loopCountEl.textContent = loopCount;
+// ─── Time calculation ──────────────────────────────────────────────────────
+
+function getPhaseForTime(date) {
+  if (date.toDateString() !== lastRealDateString) {
+    skipOffsetSeconds = 0;
+    lastRealDateString = date.toDateString();
+  }
+
+  const h = date.getHours();
+  const m = date.getMinutes();
+  const s = date.getSeconds();
+  const realSeconds = h * 3600 + m * 60 + s;
+  
+  const virtualSeconds = ((realSeconds + skipOffsetSeconds) % SECONDS_PER_DAY + SECONDS_PER_DAY) % SECONDS_PER_DAY;
+  
+  const vt_m = Math.floor(virtualSeconds / 60);
+  
+  if (vt_m >= BREAK_SIT_START_M && vt_m < BREAK_END_M) {
+    // 11:20 to 12:30 is SIT
+    return {
+      index: 0,
+      totalSeconds: (BREAK_END_M - BREAK_SIT_START_M) * 60,
+      secondsLeft: BREAK_END_M * 60 - virtualSeconds
+    };
+  }
+  
+  let cycleStartOffsetM = 0;
+  if (vt_m >= BREAK_END_M) {
+    cycleStartOffsetM = 30;
+  }
+  
+  let shiftedM = vt_m - cycleStartOffsetM;
+  let cycleHourM = Math.floor(shiftedM / 60) * 60 + cycleStartOffsetM;
+  let mInCycle = vt_m - cycleHourM;
+  
+  if (mInCycle < 15) {
+    return {
+      index: 1, // Stand
+      totalSeconds: 15 * 60,
+      secondsLeft: (cycleHourM + 15) * 60 - virtualSeconds
+    };
+  } else if (mInCycle < 20) {
+    return {
+      index: 2, // Move
+      totalSeconds: 5 * 60,
+      secondsLeft: (cycleHourM + 20) * 60 - virtualSeconds
+    };
+  } else {
+    // Sit
+    let endM = cycleHourM + 60;
+    if (endM > MINUTES_PER_DAY) {
+      endM = MINUTES_PER_DAY;
+    }
+    
+    return {
+      index: 0,
+      totalSeconds: (endM - (cycleHourM + 20)) * 60,
+      secondsLeft: endM * 60 - virtualSeconds
+    };
+  }
 }
 
 // ─── Phase transitions ─────────────────────────────────────────────────────
 
-function loadPhase(index, animate) {
-  phaseIndex   = index;
-  const phase  = PHASES[index];
-  totalSeconds = Math.max(1, phase.minutes * 60);
-  secondsLeft  = totalSeconds;
-  currentMoveExercise = phase.key === 'move' ? getRandomMoveExercise() : null;
-
-  applyPhaseUI(phase, animate);
-  updateDisplay();
+function shouldPlayWarning(animate) {
+  return secondsLeft <= 30 && secondsLeft > 0 && !warningPlayedForPhase && running && animate;
 }
 
-function nextPhase(withSignal = true) {
-  const nextIndex = (phaseIndex + 1) % PHASES.length;
-  if (nextIndex === 0) loopCount++;
-  loadPhase(nextIndex, true);
-  if (withSignal) playPhaseChime();
+function checkAndLoadPhase(animate = false) {
+  const now = new Date();
+  const phaseInfo = getPhaseForTime(now);
+  
+  totalSeconds = phaseInfo.totalSeconds;
+  secondsLeft = phaseInfo.secondsLeft;
+
+  if (phaseInfo.index !== phaseIndex) {
+    phaseIndex = phaseInfo.index;
+    warningPlayedForPhase = false;
+    const phase = PHASES[phaseIndex];
+    if (phase.key === 'move') {
+      currentMoveExercise = getRandomMoveExercise();
+    } else {
+      currentMoveExercise = null;
+    }
+    
+    applyPhaseUI(phase, animate);
+    
+    // Play sound if running
+    if (running && animate) {
+      playPhaseChime();
+    }
+  } else if (shouldPlayWarning(animate)) {
+    playWarningBeep();
+    warningPlayedForPhase = true;
+  }
+
+  updateDisplay();
 }
 
 // ─── Tick ──────────────────────────────────────────────────────────────────
 
-function consumeSeconds(secondsToConsume, withSignals) {
-  let warningPlayed = false;
-  let transitionAttempts = 0;
-
-  while (secondsToConsume > 0) {
-    if (secondsLeft <= 0) {
-      nextPhase(withSignals);
-      transitionAttempts++;
-      if (secondsLeft <= 0 && transitionAttempts >= PHASES.length) {
-        break;
-      }
-      continue;
-    } else {
-      transitionAttempts = 0;
-      const nextSecondsLeft = secondsLeft - 1;
-      const crossedWarningThreshold = secondsLeft >= 30 && nextSecondsLeft < 30;
-      if (withSignals && !warningPlayed && crossedWarningThreshold) {
-        playWarningBeep();
-        warningPlayed = true;
-      }
-      secondsLeft--;
-      secondsToConsume--;
-    }
-  }
-  updateDisplay();
-}
-
-function syncElapsedTime() {
-  if (!running || lastTickMs === null) return;
-
-  const now = Date.now();
-  const elapsedSeconds = Math.floor((now - lastTickMs) / 1000);
-  if (elapsedSeconds <= 0) return;
-
-  lastTickMs += elapsedSeconds * 1000;
-  consumeSeconds(elapsedSeconds, true);
-}
-
 function tick() {
-  syncElapsedTime();
+  if (running) {
+    checkAndLoadPhase(true);
+  }
 }
 
 // ─── Controls ──────────────────────────────────────────────────────────────
 
 function startTimer() {
   if (running) return;
-  running    = true;
-  lastTickMs = Date.now();
+  
+  // Browsers require interaction to play audio. 
+  // We can init audio context here.
+  getAudioContext();
+  
+  running = true;
+  checkAndLoadPhase(false);
   intervalId = setInterval(tick, TICK_INTERVAL_MS);
-  startStopBtn.textContent = '⏸ Pause';
-  startStopBtn.setAttribute('aria-label', 'Pause timer');
+  startStopBtn.textContent = '⏸ Pause Tracking';
+  startStopBtn.setAttribute('aria-label', 'Pause tracking');
 }
 
 function pauseTimer() {
   if (!running) return;
-  syncElapsedTime();
   clearInterval(intervalId);
   intervalId = null;
   running    = false;
-  lastTickMs = null;
-  startStopBtn.textContent = '▶ Resume';
-  startStopBtn.setAttribute('aria-label', 'Resume timer');
-}
-
-function resetTimer() {
-  pauseTimer();
-  phaseIndex = 0;
-  loopCount  = 1;
-  loadPhase(0, false);
-  startStopBtn.textContent = '▶ Start';
-  startStopBtn.setAttribute('aria-label', 'Start timer');
+  startStopBtn.textContent = '▶ Start Tracking';
+  startStopBtn.setAttribute('aria-label', 'Start tracking');
 }
 
 // ─── Event listeners ───────────────────────────────────────────────────────
@@ -338,18 +381,21 @@ startStopBtn.addEventListener('click', () => {
   else         startTimer();
 });
 
-resetBtn.addEventListener('click', resetTimer);
+resetBtn.addEventListener('click', () => {
+  skipOffsetSeconds = 0;
+  checkAndLoadPhase(true);
+});
 
 skipBtn.addEventListener('click', () => {
-  const wasRunning = running;
-  pauseTimer();
-  nextPhase();
-  if (wasRunning) startTimer();
+  const now = new Date();
+  const phaseInfo = getPhaseForTime(now);
+  skipOffsetSeconds += phaseInfo.secondsLeft;
+  checkAndLoadPhase(true);
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    syncElapsedTime();
+  if (!document.hidden && running) {
+    checkAndLoadPhase(false);
   }
 });
 
@@ -362,7 +408,7 @@ document.addEventListener('keydown', (e) => {
     else         startTimer();
   }
   if (e.code === 'KeyR' && e.target === document.body) {
-    resetTimer();
+    resetBtn.click();
   }
   if (e.code === 'KeyS' && e.target === document.body) {
     skipBtn.click();
@@ -371,4 +417,4 @@ document.addEventListener('keydown', (e) => {
 
 // ─── Init ──────────────────────────────────────────────────────────────────
 
-loadPhase(0, false);
+checkAndLoadPhase(false);
