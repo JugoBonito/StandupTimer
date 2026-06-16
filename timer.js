@@ -417,4 +417,4 @@ document.addEventListener('keydown', (e) => {
 
 // ─── Init ──────────────────────────────────────────────────────────────────
 
-checkAndLoadPhase(false);
+startTimer();
