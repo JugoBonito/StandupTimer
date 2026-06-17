@@ -1,4 +1,4 @@
-# StandupTImer
+# StandupTimer
 
 An endless-loop posture timer that cycles through three phases repeatedly to encourage healthy movement habits throughout the day.
 
